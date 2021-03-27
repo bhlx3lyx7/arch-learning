@@ -9,7 +9,7 @@ LevelDB is a key/value store built by Google. It can support an ordered mapping 
 
 ## Design
 - Sequential write to disk is 200MB/s, which is much much faster than random write.
-- [LSM](lsm) designs for sequential write
+- [LSM](lsm.md) designs for sequential write
 - light weight filed-based database like SQLite
 - opensource implementation of google BigTable
 - atomic operation in one call
