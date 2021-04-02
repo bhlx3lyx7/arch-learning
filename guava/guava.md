@@ -1,5 +1,8 @@
 # Guava Learning
 
+## Basic
+- Precondition: static methods for precondition check
+
 ## Collections
 - Multiset
 - Multimap
