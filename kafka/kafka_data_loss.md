@@ -89,6 +89,8 @@ Furthermore, 参考了一下源代码：
 
 但是这时又注意到源代码里还有这样的部分：
 - [Update ISR](https://github.com/apache/kafka/blob/40f001cc537d6ff2efa71e609c2f84c6b934994d/core/src/main/scala/kafka/cluster/Partition.scala#L1328-L1351)
+- [Send ISR Update Request](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/server/AlterIsrManager.scala#L157-L201)
+- [Send Request Queue Thread](https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/server/BrokerToControllerChannelManager.scala#L249-L258)
 
 Update ISR的过程是先update leader local ISR，再提交到queue里remote persist，这是一个异步提交的过程，有回调方法，所以这里可能会有ISR不同步的情况，导致data loss。
 
