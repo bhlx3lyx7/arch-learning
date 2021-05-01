@@ -138,7 +138,7 @@ Using the above data flush mechanism, it is safe for the sync thread to skip dat
 #### Data compaction
 On bookies, entries of different ledgers are interleaved in entry log files. A bookie runs a garbage collector thread to delete un-associated entry log files to reclaim disk space. If a given entry log file contains entries from a ledger that has not been deleted, then the entry log file would never be removed and the occupied disk space never reclaimed. In order to avoid such a case, a bookie server compacts entry log files in a garbage collector thread to reclaim disk space.
 
-There are two kinds of compaction running with different frequency: minor compaction and major compaction. The differences between minor compaction and major compaction lies in their threshold value and compaction interval.
+There are two kinds of compaction running with different frequency: minor compaction and major compaction. The differences between minor compaction and major compaction lies in their **threshold value** and **compaction interval**.
 - The garbage collection threshold is the size percentage of an entry log file occupied by those undeleted ledgers. The default minor compaction threshold is 0.2, while the major compaction threshold is 0.8.
 - The garbage collection interval is how frequently to run the compaction. The default minor compaction interval is 1 hour, while the major compaction threshold is 1 day.
 
@@ -151,6 +151,53 @@ The data compaction flow in the garbage collector thread is as follows:
 - Once all valid entries have been copied, the old entry log file is deleted.
 
 ### ZooKeeper metadata
+
+BookKeeper requires a ZooKeeper installation for storing ledger metadata. Whenever you construct a `BookKeeper` client object, you need to pass a list of ZooKeeper servers as a parameter to the constructor, like this:
+
+```
+String zkConnectionString = "127.0.0.1:2181";
+BookKeeper bkClient = new BookKeeper(zkConnectionString);
+```
+
+> BookKeeper client needs to talk to ZooKeeper server.
+
+### Ledger manager
+
+A *ledger manager* handles ledgers’ metadata (which is stored in ZooKeeper). BookKeeper offers two types of ledger managers: the *flat ledger manager* and the *hierarchical ledger manager*. Both ledger managers extend the `AbstractZkLedgerManager` abstract class.
+
+#### Hierarchical ledger manager
+
+> default ledger manager.
+> 
+> The hierarchical ledger manager is able to manage very large numbers of BookKeeper ledgers (> 50,000).
+
+The *hierarchical ledger manager*, implemented in the `HierarchicalLedgerManager` class, first obtains a global unique ID (ledger ID) from ZooKeeper using an `EPHEMERAL_SEQUENTIAL` znode. Since ZooKeeper’s sequence counter has a format of `%10d` (10 digits with 0 padding, for example `0000000001`), the hierarchical ledger manager splits the generated ID into 3 parts: 
+```
+{level1 (2 digits)}{level2 (4 digits)}{level3 (4 digits)}
+```
+
+These three parts are used to form the actual ledger node path to store ledger metadata:
+```
+{ledgers_root_path}/{level1}/{level2}/L{level3}
+```
+
+For example, ledger `0000000001` is split into three parts, `00`, `0000`, and `00001`, and stored in znode `/{ledgers_root_path}/00/0000/L0001`. Each znode could have as many 10,000 ledgers, which avoids the problem of the child list being larger than the maximum ZooKeeper packet size (which is the limitation that initially prompted the creation of the hierarchical ledger manager).
+
+> The default data limit for each node in ZooKeeper is 1M.
+> 
+> Through the zookeeper source, there's no explicit limit to child count . But the `childCount` is `int` type, the max should is `Integer#MAX_VALUE`.
+
+#### Flat ledger manager
+
+> deprecated since 4.7.0, not recommand now.
+
+The *flat ledger manager*, implemented in the `FlatLedgerManager` class, stores all ledgers’ metadata in child nodes of a single ZooKeeper path. The flat ledger manager creates sequential nodes to ensure the uniqueness of the ledger ID and prefixes all nodes with `L`. Bookie servers manage their own active ledgers in a hash map so that it’s easy to find which ledgers have been deleted from ZooKeeper and then garbage collect them.
+
+The flat ledger manager’s garbage collection follow proceeds as follows:
+- All existing ledgers are fetched from ZooKeeper (`zkActiveLedgers`)
+- All ledgers currently active within the bookie are fetched (`bkActiveLedgers`)
+- The currently actively ledgers are looped through to determine which ledgers don’t currently exist in ZooKeeper. Those are then garbage collected.
+- The *hierarchical ledger manager* stores ledgers’ metadata in two-level znodes.
 
 ## Architecture
 
