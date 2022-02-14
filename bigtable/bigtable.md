@@ -17,3 +17,4 @@ typical wide-column stores:
 ## References
 - wiki of bigtable: https://en.wikipedia.org/wiki/Bigtable
 - wiki of wide-column store: https://en.wikipedia.org/wiki/Wide-column_store
+- 行存储，列存储，宽列存储: https://www.51cto.com/article/618846.html
