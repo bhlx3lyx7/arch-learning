@@ -7,6 +7,13 @@ Wide-column stores such as Bigtable and Apache Cassandra are not column stores i
 
 Wide-column stores that support column families are also known as column family databases.
 
+typical wide-column stores:
+- Apache Accumulo
+- Apache Cassandra
+- Apache HBase
+- Bigtable
+- Azure Tables
+
 ## References
 - wiki of bigtable: https://en.wikipedia.org/wiki/Bigtable
 - wiki of wide-column store: https://en.wikipedia.org/wiki/Wide-column_store
