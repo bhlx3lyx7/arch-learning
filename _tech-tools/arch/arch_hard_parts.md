@@ -142,7 +142,11 @@ Different database types:
 
 ## Chapter 7 - Service Granularity
 
+### Granularity Disintegrators
 
+
+
+### 
 
 ## Chapter 9 - Data Ownership and Distributed Transactions
 

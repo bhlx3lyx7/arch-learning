@@ -176,5 +176,81 @@ types of isolations/solutions:
 - materialized view caches pre-computed analytic data set; data cube is similar, it pre-computes on multi dimensions
 
 ## EP10: unreliable clocks
+- time drift between nodes leads to time difference
+- machine time is unreliable for event ordering
+
+## EP11: fencing tokens
+- process pause: a process is running and be preempted by another "stop the world" process for many seconds
+	+ long GC
+	+ virtual machine moved from one host to another
+	+ a user closes his laptop lid
+- during process pause, the lease of a distributed lock or leader election could be expired, another process can get the lock or leader role
+- fencing token: assign a monotonically increasing id for the lock or leader election, write data to storage with the id, if storage receives a lower fencing token value than current one, reject it
+- fencing token is an important machenism for leader election (leader epoch), to make the majority decision over a single node decision
+
+## EP12: linearizability and ordering
+- linearizability = strong consistency
+	+ always up to date
+	+ huge performance hit
+- linearizability: act as if there is only one copy of the data, there should be a total order of operations on the data; the state should be able to be expressed by all the operations in some set order, with causality preserved, and concurrent operations can be in any order, but should be in the same order in each replica
+- causality can be expressed by just a partial order, so linearizability > causality
+- how to create a total order
+	+ single leader replication: WAL (write ahead log)
+	+ leaderless / multileader replication: lamport timestamp; version vector
+- lamport timestamp vs. version vector
+	+ lamport timestamp take less space (O(1) < O(k))
+	+ version vector can express concurrent operations since it is partial ordering, whereas lamport timestamp is total ordering
+		* lamport timestamp loses information as it simply keeps the largest timestamp
+		* lamport timestamp has no ability for custom merging/sibling logic
+- pitfalls of lamport timestamp
+	+ it gives a total order retroactively (not in realtime, just after synced from all replicas), so at the moment of client requests, they could both receive success response, but after convergence, one of them would be a failure
+- total order broadcast: the protocal to propagate the total order in time, without data loss or misorder
+- consensus: the equivalant to solving the total order broadcast or linearizable storage
+
+## EP13: two phase commit
+- 2PC (two phase commit): involve coordinator, participant nodes; for distributed atomic transaction
+	+ phase 1, prepare
+	+ phase 2, commit/abort
+	+ participant nodes should guarantee the phase 1 response can be committed in phase 2 if it responses ok
+	+ coordinator should keep retrying to guarantee the phase 2 executed and succeed
+- 2PC lacks fault tolerance
+	+ coordinator is single node or single leader replication, if it is down, the whole system can not process
+	+ if participant node is down, the transaction can not be committed or aborted until the coordinator can reach it
+	+ so 2PC always requires the availability and consistency of coordinator and participant nodes
+- heterogenous vs. db internal transactions
+	+ heterogenous: among different types of db, using an API called XA, hard to optimize for performance
+	+ db internal transactions: on the same type of db, more information can be shared, easier to optimize performance
+
+## EP14: Raft
+- one leader sends all writes to follower nodes
+- once majority (quorum) responses are received, the leader tells the followers to commit
+- if a leader presumed to be dead, a follower node begins an elelction to be a new leader with a higher term number (fencing token)
+- leader election
+	+ leader sends heartbeat periodically to followers
+	+ if heartbeat timeout, a follower becomes a candidate to start new leader election, votes for itself
+		* heartbeat timeout is randomized over a range, in case all the followers vote for themselves at the same time
+	+ the other nodes will vote for a candidate if the term number is higher than local, or the candidate log is more up to date, and the node has not voted for any other candidate in this term; else it rejects the vote
+	+ a candidate becomes a leader if it receives majority votes
+- broadcast messages
+	+ leader receives a message, it writes to local log, not committed yet
+	+ send it to all the followers, the sending function can be called as replicateLog
+	+ replicateLog function is periodically called, act as heartbeat, to keep logs in sync, and ask other nodes to commit messages that should be committed
+	+ leader keeps track of sent messages number for each other node, and split its local log into a prefix and suffix, for each node as well
+		* prefix: the logs has been sent to the remote node
+		* suffix: the logs not yet sent to the remote node
+		* the prefix of some nodes could be wrong, then leader can adjust it when receiving follower response
+	+ when a follower receives the suffix logs, together with the term number of the last prefix log, it checks the term number matches local log or not
+		* if matches, just go and copy the suffix logs, response ok
+		* if not match, response reject
+	+ when the leader receives response from a follower
+		* if success, it keeps track and waits for quorum positive responses to commit the message and notify followers
+		* if fail, it must try the write again with a smaller prefix, to overwrite the inconsistent logs on the follower node
+		* also possible, the follower's response may tell that it has a higher term number write, then the leader gives up being a leader
+- comparing with 2PC, Raft is good for making replicated logs, but not so great for cross partition atomic transactions
+
+## EP15: batch processing
+
+
+
 
 
