@@ -90,7 +90,7 @@
 - send reads and writes to all nodes in parallel, responds when predefined threshold of nodes return success
 - keep data up to date
 	+ anti-entropy: background process looks at multi nodes and stored values, use version numbers to make sure each replica holds the most up to date copy of the data
-	+ read repaire: read from multi nodes in parallel, take the most up to date piece and propagate it to the other replicas which had outdated data
+	+ read repair: read from multi nodes in parallel, take the most up to date piece and propagate it to the other replicas which had outdated data
 - quorums: w + r > n; implicitly, quorum write doesn't have guarantee of order
 - quorums are not perfect
 	+ if less than w writes succeed, the client is told a write failure, but the succeeded nodes will not undo the write
@@ -245,12 +245,219 @@ types of isolations/solutions:
 	+ when the leader receives response from a follower
 		* if success, it keeps track and waits for quorum positive responses to commit the message and notify followers
 		* if fail, it must try the write again with a smaller prefix, to overwrite the inconsistent logs on the follower node
-		* also possible, the follower's response may tell that it has a higher term number write, then the leader gives up being a leader
+		* also possible, the follower's response may tell that it has a higher term number write, then the leader steps down
 - comparing with 2PC, Raft is good for making replicated logs, but not so great for cross partition atomic transactions
 
 ## EP15: batch processing
+- bounded data set
+- HDFS, MapReduce
+	+ sort merge join
+	+ broadcast hash join
+	+ partitioned hash join
+- pitfalls of MapReduce
+	+ data skew
+	+ intermediate state on disk might be wasteful
+- Spark
+	+ chained by operators
+	+ data locality can be maximized due to entire data flow described
+	+ parallel computation
+	+ intermediate state materialized by command if necessary
 
+## EP16: streaming processing
+- unbounded data set
+- producer, consumer, broker
+- message broker
+	+ delivery patterns: fan out (consumer group); load balancing (consumers in one group)
+	+ types: in mem (redis); log base (kafka)
+- use cases
+	+ logging and metrics
+		* windowing for accumulation
+	+ change data capture: db change logs
+		* can be compacted by only holding the most recent value of keys
+	+ event sourcing
+		* keep all the original events, can not be compacted
+		* many different views can be derived from it, in eventual consistent way
+- stream joins
+	+ stream-stream join
+		* window and watermark
+	+ stream-table join
+		* cache table in stream processor, with delta changes to update
+	+ table-table join
+		* batch data + delta changes
+- fault tolerance / exactly once
+	+ at least once: checkpoint, micro-batch
+	+ idempotency / atomic transaction (2PC)
 
+## EP17: consistent hashing
+- sharding, load balancing
+- ring of hash result range, multi sub-partitions of a node scattered on the ring
+- dynamic add / remove node, less data set moved
+
+## EP18: gossip protocol
+- relatively low overhead to broadcast messages, for failure detection in large clusters
+- broadcast message to few nodes randomly
+- in cassandra
+	+ each node gossip with other nodes regarding its own local load
+	+ each node gossip with other nodes about heartbeats it receives from all other nodes, with a timestamp
+	+ other nodes keep only the most recent messages (with the most recent timestamp) and pass them on
+	+ all nodes use the most recent heartbeat timestamp to determine which nodes are still alive
+
+## EP19: Cassandra deep dive
+- NoSQL, wide column, column family
+	+ row oriented storage
+	+ rows can have any number and type of columns
+	+ with one primary key as partition key
+	+ other columns of a row can be designated as clustering keys
+- storage: LSM tree + SSTable
+	+ fast write
+	+ slower read
+- replication
+	+ admin chooses quorum of write success, which could be non strong consistent
+	+ conflict writes can be handled by
+		* last write wins
+		* read repair on reads
+		* anti-entropy process in background
+- fault tolerance
+	+ data stored in replicas: read/write throughput for linear scalability; replication topology to tolerate DC level node invalid
+	+ gossip protocol for heartbeat detection
+- index: use clustering keys within a partition
+	+ local index, not global index
+	+ multi ordered clustering keys keeps multi copies, which slows down writes
+- use case
+	+ write heavy applications
+	+ reads within a single partition
+- pitfalls
+	+ lack of strong consistency
+	+ can not support data relationships
+	+ lack of global secondary index
+
+## EP20: coordination services
+- write strong consistency of shared state, writes are slower than no broadcasting mechanism
+- it is always for read heavy workloads, but not very good read performance
+- by default, coordination service is not strong consistent for read
+	+ no monotonic read, but monotonic read can be achieved if:
+		* when client read/write, it stores the last seen offset
+		* then it reads from a replica with the offset, it can judge if it is up to date or not, need to wait or try another replica
+- ensure predicate validity: it is an alternative of predicate lock of db
+	+ user can watch a key before read, and any related writes to db will update the key first, so the client can receive a notification that the read is out of date
+	+ it is kind of a similar approach to serializable snapshot isolation, in a third-party coordination service
+- for read strong consistency
+	+ read from leader: leader traffic pressure
+	+ sync
+		* when client reads, it firstly writes a "sync" into replicated log, get the current offset, or writes the "sync" id into state
+		* then client reads from any replica with the offset or "sync" id, it responds only if it is up to date: offset exceeds, or the "sync" id received
+	+ quorum read: not completely perfect
+		* read from majority of nodes, then at least one node has the most up to date write
+		* corner case: an entry is committed in leader, but not yet committed in followers, then concurrent reads from majority nodes could get different results, which is not strong consistent; the same entry replicated to replicas can not be ready for read at the same time
+- coordination service uses a centralized, replicated key value store built on top of a consensus algorithm
+	+ it is not built to handle strong consistency out of the box, there are some ways of achieving strong consistent reads, at the cost of significantly reduced performance
+
+## EP21: Hadoop file system design
+- write a file once, read it many times
+- files are stored in chunks, typically around 64-256mb per chunk
+- chunks are replicated for data durability and availability
+- name node: metadata of files, track of chunks
+	+ all metadata in memory
+	+ all changes write edit log (WAL)
+	+ checkpoint of state for failure recovery
+	+ receive block report from data nodes, automatically replicate insufficient replicas
+- replication
+	+ "rack aware" replication
+	+ replication pipelined from one replica to the next
+- hadoop reads
+	+ name node tells the list of data nodes holding a chunk
+	+ client reads from the proper data node, usually the closest one
+- hadoop writes, to append a file
+	+ pick a primary replica of the file chunk
+	+ all other replicas are secondary, appended in the replication pipeline
+	+ once all replicas acks the write, client receives a success
+- HA HDFS
+	+ active name node writes the edit log into zk (quorum journal manager)
+	+ back up name node reads the log from zk, to rebuild state
+
+## EP22: HBase/BigTable deep dive
+- wide column, column family
+	+ column oriented storage
+- master server
+	+ file metadata
+	+ leverage zk for WAL and support a back up master node, for fault tolerance
+- region server
+	+ heartbeat to zk for aliveness report
+	+ LSM tree + SSTable (HFile), in column oriented format
+- replication
+	+ region node is usually running on HDFS data node, it uses HDFS replication pipeline to synchronously replicate HFile
+	+ column oriented storage provide high read throughput
+- similar to Cassandra, both using LSM tree + SSTable, with difference that
+	+ Cassandra: row oriented storage
+	+ HBase: column oriented storage
+	+ thus HBase is better for analytic queries
+
+## EP23: conflict-free replicated data types (CRDT)
+- multileader/leaderless replication increases write throughput, which inevitably leads to conflicts
+- the goal of CRDT is convergence
+- use cases
+	+ collaborative editing
+	+ online chat system
+	+ offline editing
+	+ distributed leaderless key-value store like Riak and Redis
+- CRDT types
+	+ operations based CRDT, commutative replicated data types (CmRDT)
+		* only delta ops are transmitted
+		* not idempotent, network ensures
+	+ state based CRDT, convergent replicated data types (CvRDT)
+		* should be commutative and idempotent
+		* works well with gossip protocol
+
+## EP24: Riak explained
+- distributed key-value store, optimized for great write and read
+- similar to Cassandra, it achieves high throughput by
+	+ parititioning
+	+ multi-leader replication
+	+ LSM tree
+	+ read repair + anti-entropy
+- differences from Cassandra
+	+ data modeling
+		* key-value store
+		* secondary index for queries other than key requires extra metadata, but it is not ideal
+	+ conflict resolution
+		* Cassandra uses last write wins, which loses data and is based on unreliable timestamp
+		* Riak uses version vector, with sibling values of concurrent writes, application can handle the sibling values with its own logic for next write
+		* Riak also support some CRDTs: counter, set, map
+
+## EP25: distributed caching primer
+- faster reads to the end client
+	+ store precomputed values
+	+ fewer network calls to database
+	+ fewer workload on database
+- increased complexity on writes
+	+ write around: write db, then invalidate key in cache
+	+ write through: write db, then write cache
+	+ write back: eventual consistency
+- local cache vs. global cache
+	+ local cache: no extra network calls if cache hit
+	+ global cache: independent scalability, better for replication and partitioning, globally used
+
+## EP26: Redis and Memcached explained
+- Memcached
+	+ string to string hashmap
+	+ consistent hashing
+	+ compare and set
+	+ no failure handling or replication
+- Redis
+	+ string to multi data types hashmap
+	+ transactions on a single partition
+	+ range query on a single partition
+	+ disk persistence via checkpoint or WAL
+- Redis cluster
+	+ single leader replication with automatic failover
+	+ gossip protocol with heartbeat among nodes
+	+ 16384 hash ranges predefined, which can be moved between nodes
+- why not use Redis cluster?
+	+ strong consistency needed
+	+ other replication patterns like multi-leader or leaderless
+	+ prefer a coordination service for configuration or partition management other than gossip
+
+## EP27: search indexes
 
 
 

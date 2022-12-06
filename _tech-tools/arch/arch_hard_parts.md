@@ -144,9 +144,41 @@ Different database types:
 
 ### Granularity Disintegrators
 
+- Service scope and function
+	+ Single-purpose services with tight cohesion
+- Code volatility
+	+ Agility (reduced testing scope and deployment risk)
+- Scalability and throughput
+	+ Lower costs and faster responsiveness
+- Fault tolerance
+	+ Better overall uptime
+- Security
+	+ Better security access control to certain functions
+- Extensibility
+	+ Agility (ease of adding new functionality)
+
+### Granularity Integrators
+
+- Database transactions
+	+ Data integrity and consistency
+- Workflow and choreography
+	+ fault tolerance of sync calls
+	+ performance and responsiveness
+	+ data consistency and integrity
+- Shared Code: Maintainability
+	+ Specific shared domain functionality
+	+ Frequent shared code changes
+	+ Defects that cannot be versioned
+- Data Relationships
+	+ Data integrity and correctness
+
+### Finding the Right Balance
+
+Make decision by balancing the reasons of disintegrators and integrators.
+
+## Chapter 8 - Reuse Patterns
 
 
-### 
 
 ## Chapter 9 - Data Ownership and Distributed Transactions
 
