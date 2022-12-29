@@ -458,6 +458,111 @@ types of isolations/solutions:
 	+ prefer a coordination service for configuration or partition management other than gossip
 
 ## EP27: search indexes
+- Lucene
+	+ the most popular open source search index
+	+ the index behind ElasticSearch and Solr
+- Lucene architecture
+	+ LSM tree + SSTable
+		* write to in mem buffer first, can not be read yet, need to be on disk
+		* eventually write to immutable SSTable index file on disk
+		* SSTables are eventually merged and compacted
+		* read from multiple SSTables, and results from them are eventually merged
+	+ tokenization
+		* when a document (text string) is written, it is split into terms
+		* all problems of natural language processing should be covered, like handling punctuation, case, contraction, common words like "the" or "and"
+	+ inverted index
+		* after tokenization, each document is given an ID, and added into inverted index
+		* inverted index is a map from terms (words) to list of document IDs, and sorted by term
+		* space saved by using document IDs in the index
+	+ other copies of indexes can be created for other search capabilities, like suffix search
+	+ Lucene supports a lot of cool search capabilities: text, number, similar words, geolocation
+- ElasticSearch
+	+ Lucene index + distributed cluster
+	+ it creates a bunch of local inverted indexes for the documents on a given node
+	+ it is better to keep search on the same shard, and avoid across shard queries
+- ElasticSearch caching
+	+ cache of index pages in mem by operating system
+	+ ES caches queries on a shard level in mem, with search result, parts of certain queries which might be used by other queries with the same filters
+	+ assumption is the data on the shard has not changed
+
+## EP28: time series databases
+- write once, read many times, corresponding to a range of time
+- InfluxDB, TimescaleDB, Apache Druid
+- write optimize
+	+ index of source id + timestamp; same data source of similar intervals of time can be on the same node
+- read optimize
+	+ column oriented storage; columns are usually similar and infrequently changed
+	+ chunk table of (source id, time interval), simpler to maintain and keep index respectively; it is also easiler for truncation
+
+## EP29: geospatial indexes
+- geohashing
+	+ split a region into subregions, and so on
+	+ subregion hash code string prefixed by parent hash code
+- geospatial index
+	+ convert point to geohash
+	+ find the geohash depth by distance size
+	+ range query by geohash string
+- geospatial index can be distributed over multiple nodes by partitioning
+- Lyft uses Redis geospatial index; Uber build its own geospatial index called H3, which uses hexagon instead of rectangle
+- similar index R-tree, for polygon shapes, not only for points
+
+## EP30: chain replication
+- chain replication
+	+ write to head node
+	+ read from tail node
+	+ sync from head to tail, ack from tail to head
+	+ strong consistency
+	+ fault tolerance depends on external coordination service for node failure detection
+- CRAQ: chain replication with apportioned queries
+	+ if read(k) goes to a replica with highest version number of key k is clean, it safely return the value
+	+ if read(k) goes to a replica with highest version number of key k is dirty, it must first ask the tail what is the current version number of the key, then return the version of value
+	+ the read throughput is improved
+- chain replication can be used for object storage
+
+## EP31: content delivery networks (CDN)
+- storing static content, object store
+- world wide client requests needs CDNs
+- geographically distributed cache for static content (rarely changed)
+	+ push: servers periodically send data to CDN, e.g. news site, HTML home page
+	+ pull: clients ask CDN for content, if not exist, it reads from server and store, e.g. social media site
+- pros
+	+ greately reduces load on server for popular content
+	+ greately increase speed to users around the world
+- cons
+	+ may occasionally serve stale data, or slow down requests on cache misses
+	+ have to change static URLs in database to reflect that they are now stored by the CDN
+
+## EP32: Google Spanner
+- Spanner is a database created by Google that falls into the category of NewSQL, it designs based on relational data model, with system scalability supported
+	+ Relies on using synchronized clocks aka TrueTime (atomic clock and GPS)
+	+ CockroachDB is similar, but using less synchronized clock (HLC with NTP), makes the solution a bit less viable
+- Spanner guarantees
+	+ ACID transactions
+		* atomicity: 2PC across shards
+		* serializability: 2PL on a single node
+	+ replicas are consistent via a consensus algorithm
+	+ linearizable reads and writes
+- Spanner optimizes 2PL
+	+ issue of 2PL: dead lock if 2 threads holds exclusive/write lock and shared/read lock respectively; Spanner doesn't require shared lock for reading threads, then performance enhanced, and dead lock avoided
+	+ consistent snapshot: if a snapshot contains a write, then all the writes it depends on must be present, which keeps the causality
+	+ Spanner uses TrueTime to track causality, only the writes with lower timestamp can be read
+	+ TrueTime is expressed as a time range with very short interval `[t_min, t_max]`, which means the actual timestamp falls in the range with a very high probability, if `a.t_max < b.t_min`, then `a < b`, which means a happens before b
+	+ a write at `[t1-d, t1+d]` must wait for `2d` before committing, it can be seen by a read at `[t2-d, t2+d]` only if `t1+d < t2-d`, so the snapshot seen by reader is consistent.
+		* it is similar to the late messages in streaming system, with a watermark to determine which messages can be seen
+		* the difference is that message could be late in streaming system, but here the timestamp is created in server node, so no late request due to network transmission, only by time drift, and TrueTime guarantees the time drift is very short
+		* in TrueTime, `d = ~7ms`, `2d = ~14ms`, so the wait time of writes is acceptable, and performance not hurt
+- Why not Lamport timestamp?
+	+ Lamport timestamp provides a total ordering of writes with causality, but the ordering of concurrent writes could be unexpected, which is not linearizable
+	+ Lamport timestamp in different nodes could have huge gap if no frequent cross traffic, so the ordering of different nodes is arbitrary, even an hour earlier write A in node 1 is ordered after current write B in node 2; then a reader can see `A` some minutes ago, but see `B < A` now, it is not consistent, and breaks linearizability
+- Why not centralized timestamp?
+	+ a centralized timestamp provider is called TSO (timestamp oracle), it gives timestamp/ordering to each write
+	+ it will be a bottleneck of performance and single node of failure, also network latency for users around the world
+- conclusion
+	+ Spanner uses non-commodity hardware to achieve high throughput and linearizability, which is hard to be used for most businesses.
+	+ if we can achieve synchronized clock, we can depend on the timestamp for ordering, even in distributed system.
+
+## EP33: load balancing
+
 
 
 
