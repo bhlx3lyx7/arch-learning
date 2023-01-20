@@ -145,12 +145,12 @@ types of concurrency issues:
 	+ read committed isolation
 - read skew (non-repeatable read): multi read inconsistent state during a txn
 	+ snapshot isolation: each txn id is saved with the rows it writes, value can be seen if it has the highest txn id while smaller than reader txn id
-- lost update: concurrent txns to read value, change and update, there might be update lost
+- lost update: concurrent txns to read value, change and update, there might be update lost (for single row)
 	+ atomic write operation: CAS, exclusive lock
 	+ explicit lock: hard to reason about, lead to many bugs
 	+ automatic db detection: use snapshot isolation to detect lost updates (can detect the value it is about to write has been changed by other txn id), and then rollback and retry
 	+ these solutions doesn't work in multi-leader/leaderless replication, because they assume one copy of data, better to store conflicts as siblings or use custom resolution logic
-- write skew: concurrent txns to read a set of rows, make decision and update, which might impact the read set of rows
+- write skew: concurrent txns to read a set of rows, make decision and update, which might impact the read set of rows (for multi rows)
 	+ predicate lock: lock to all the rows reading to form the predicate, but the non-exist row can not be locked
 - phantoms: same issue as write skew, but invariant are broken when both txns create a new row, nothing can be locked
 	+ materialize conflicts: create a physical row or object, then concurrent txns can lock on it
@@ -562,7 +562,24 @@ types of isolations/solutions:
 	+ if we can achieve synchronized clock, we can depend on the timestamp for ordering, even in distributed system.
 
 ## EP33: load balancing
+- load balancer is a type of reverse proxy
+- keep state of server node health via heartbeat, process at local as opposed to in a coordination service to speed up routing
+- routing policies
+	+ least connections
+	+ least response time
+	+ round robin, optional weighted
+	+ hashing
+- layer 4 vs. layer 7 load balancing
+	+ layer 4: network transport layer, IP address, ports in header; compute faster
+	+ layer 7: application layer, header contents; more flexibility
+- consistent hashing, useful for cache, thus reduce amount of network calls
+- availability, single point of failure is unacceptable, can be deployed as active-active or active-passive mode
+- in reality, it often performs more functionalities than just load balancing
+	+ encryption/decryption
+	+ reverse proxy
 
+## EP34: Amazon Aurora
+- AWS Aurora is a NewSQL
 
 
 
