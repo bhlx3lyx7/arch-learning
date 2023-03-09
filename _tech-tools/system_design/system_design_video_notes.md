@@ -579,7 +579,109 @@ types of isolations/solutions:
 	+ reverse proxy
 
 ## EP34: Amazon Aurora
-- AWS Aurora is a NewSQL
+- AWS Aurora is a NewSQL database which claims to gain 35x performance boost over traditional MySQL in cloud
+	+ traditional RDBMs stores B-tree in disk, and page cache in memory
+	+ Aurora decouples the cache and disk to two different servers, with log entries consumed, disk server derive state locally
+	+ memory cache server and disk storage server can replicate independently
+- quorum write; read from up to date replica with valid log position
+- replication of caching layer: read-only cache replicas can be added, leader node asynchronously propagates log changes
+- failure of database node
+	+ when a leader node is elected, a quorum read is used to figure out the greatest committed log position, and the uncommitted ones are reverted
+	+ when a server holding too much (like 1TB) storage fails, it is likely to be holding too many partitions; in order to avoid massive network overhead of copying, the shards on the node are sent to different nodes to parallelize the process of copying data
+
+## EP35: MongoDB
+- MongoDB is a document database, no enforced schema, but advised to be similar
+- architecture overview
+	+ within a collection, the documents are partitioned by shard key per record
+	+ within a shard, availability is ensured via single leader replication
+	+ B-tree based storage engine, read prioritizes write
+- cross partition operations
+	+ multi document transactions, either over the same or different shards
+	+ parallelized queires over the entire data set, speed up via secondary index
+- advantages
+	+ flexible schema
+	+ data locality by nested document structure
+	+ secondary index supported, over multiple shards
+	+ good for read by B-tree storage
+- disadvantages
+	+ lack of normalized data may require changes in multiple places
+	+ single leader replication limits write throughput scalability than leaderless replication like Cassandra
+
+## EP36: VoltDB
+- VoltDB is a NewSQL database with a variety of optimizations in order to gain performance increases over traditional relational databases
+- VoltDB executes in single thread, instead of 2PL for transaction serializability
+	+ all data stored in memory: command log + snapshot
+	+ transactions must first be stored as stored procedures: occurs in read modify write transaction
+- partition & replication
+	+ transaction across multiple shards uses one of the nodes as coordinator
+	+ replication can be done both in single leader or multi-leader manner, conflicts can be resolved by operation priority or LWW strategy
+
+## EP37: Monoliths vs. Microservices
+- monoliths
+	+ easy to implement, test, deploy, scale
+	+ hard to onboard new dev, coorparate, infra upgrade
+- microservices
+	+ deploy and scale independently
+	+ complexity of application layout
+- docker
+	+ container of applications
+	+ preconfigure the capacity of virtual node
+
+## EP38: Long Polling, WebSockets, Server Sent Events
+- How to provide real time updates from server back to a client?
+- polling: server overloaded
+- long polling, longer time out than normal polling
+	+ easy to implement, universal support
+	+ one direction, excess connections on server, race condition of same client
+- websocket, fully bidirectional channel, each registered to a port
+	+ bidirectional communication in real time, lower network overhead
+	+ less support on old browsers, overkill for infrequent change data
+- server sent events, client registers for events from server
+	+ no constantly established connection
+	+ one direction, server overload if too many registered concurrent connections, complex implementation
+
+## EP39: Apache Spark
+- problems of MapReduce
+	+ tons of disk IO due to materializing intermediate state to HDFS
+	+ many redundant maps when not actually necessary
+- Resilient Distributed Dataset (RDD)
+	+ in memory
+	+ can create from data on disk or by operation of another RDD
+	+ keeps track of the lineage of each RDD
+- fault tolerance
+	+ narrow dependency: map operation
+	+ wide dependency: reduce operation, checkpoint mechanism
+
+## EP40: Apache Flink
+- state in stream processing
+- fault tolerance
+	+ checkpoint in durable storage
+	+ checkpoint barrier message in the message queue
+- job manager node
+	+ parallelize a job into work for each task manager using dataflow graph
+	+ initiate checkpoints, and maintain the locations
+	+ achieve HA by a coordination service like ZK or etcd, track node heartbeat
+- log based message brokers as data source
+- change cluster size
+	+ checkpoint state is a list of key-value pairs, easy for re-partition
+
+## EP41: bloom filter
+- algorithm for data existance approximation
+	+ each record hash value mod length, update the bit array
+	+ when read, check data hash value existance
+- false positive, no false negative
+- to decrease false positive rate, reset a bloom filter, at the cost of losing historical data
+
+## EP42: Merkle Trees
+- algorithm for detecting difference between data sets or files, with logarithmic time cost
+	+ each file has a hash value, as leaf
+	+ several hash values grouped to a parent value, as root, the tree built
+	+ change of leaf will impact the change of related root, comparison is easy to position
+- used cases
+	+ git diff
+	+ cassandra anti-entropy, data consistency of multi-master replication
+
+## EP43: data serialization (Protocol Buffer, Thrift, Avro)
 
 
 
