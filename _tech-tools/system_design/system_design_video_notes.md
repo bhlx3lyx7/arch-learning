@@ -682,6 +682,163 @@ types of isolations/solutions:
 	+ cassandra anti-entropy, data consistency of multi-master replication
 
 ## EP43: data serialization (Protocol Buffer, Thrift, Avro)
+- data serialization across systems
+- Thrift & Protocol Buffer
+	+ use a schema to greatly reduce the size of serialized messages
+	+ field tag number to avoid field name
+- schema evolution
+	+ backward compatibility: new code can read old data
+	+ forward compatibility: old code can read new data
+	+ field tag can not change
+	+ hard to change data type of field
+- Avro
+	+ schema used, but no field tag
+	+ use schema to decode data, must be in the same order as the written fields
+	+ schema revolution supported
+		* fields matched up by field name in writer and reader schema
+		* schema version number of writer scheam attached with each record
+		* schema registry manages all the history schemas
 
+## EP44: Apache Parquet
+- Parquet chooses to use a hybrid approch, instead of pure row/column oriented
+	+ partition the row space, and within each partition use column oriented storage
+- data split into Parquet files (row groups)
+	+ row groups are partitions of rows
+	+ a footer with some metadata pertaining to the information in the row group
+- row group is split into chunks (by column)
+	+ each chunk of a given column contains 1MB pages, each page contains some metadata of the data in this page
+		* min, max, count
+		* dictionary of elements
+		* bloom filter
+- data encoding
+- metadata accelerates queries, pre-sorted data can skip some pages
 
+## EP45: TCP versus UDP
+- Transmission Control Protocol (TCP), provides reliable, ordered (via seq num), and error checked (via checksum) streams of bytes
+	+ handshake, three-way handshake: A --(seq x)--> B, B --(ack x+1, seq y)--> A, A --(ack y+1)--> B
+	+ reliable transmission
+		* dup ack retransmission: A --(data packet, seq 99)--> B
+			- B --(ack, seq 100)--> A, success, will send next packet
+			- B --(ack, seq 99)--> A, packet 99 missed, will resend packet 99 again
+		* timeout based estimate, resend if ack not received within timeout
+	+ flow control
+		* rest buffer space of receiver is acked to sender, so sender will not send too much data later
+		* if receiver has no room left, sender waits for some time, and sends a small packet to check space
+	+ congestion control
+		* network could be overwhelmed if too many packets sent over it
+		* mitigation strategy: congestion window tracks number of packets of a connection, window size increase linearly (`+1`), but decrease exponentially (`/2`) if network overloaded
+	+ connection termination
+		* four-way handwave
+			- A --(FIN)--> B, A active close, notify B
+			- B --(ACK)--> A, B passive close, ack A
+			- B --(FIN)--> A, B ready to close, notify A
+			- A --(ACK)--> B, A ack B, and wait some time to close; wait time to ensure undelivered message can be discarded, in case if another new connection of this port can see them
+- User Datagram Protocol (UDP), one node indiscriminately starts sending data to another node without any consideration for flow control, dropped packets, out of order, error detection, or congestion control
+- comparison
+	+ UDP: faster, no need for ack, just send
+		* real time app that do not care data loss, like video chatting, video games, DNS server, stock price
+	+ TPC: slower, guarantees of data delivery and ordering, network overload protection
+		* better for most typical REST servers
+		* provide guarantees against DDOS attacks
+
+## EP46: Certificate Transparency (SSL/TLS)
+- certificate transparency is used in HTTPS, which takes traditional HTTP request and adds an additional security layer (SSL/TLS)
+- RSA (public key) encryption
+	+ server generates public key and private key, public key is broadcasted to clients
+	+ client encrypts message using public key
+	+ server decrypts message using private key
+	+ client has to make sure the public key is from the server, not a man in the middle
+- Certificate
+	+ verify that a server is actually who it says it is
+	+ server must register a Certificate Authority, providing information about the server such as its owner, IP address, public key, authority it registered with (verifiable via a digital signature)
+- Certificate Authority (CA)
+	+ private key encrypt the certificate, it is used as the digital signature, client can decrypt the signature with public key
+	+ if CA is hacked, can we trust it?
+- [Certificate Transparency](https://certificate.transparency.dev/howctworks/)
+	1. website owner requests a certificate from CA
+	2. CA issues a precertificate
+	3. CA sends precertificates to append-only logs
+	4. precertificates are added to logs, with check of Merkle trees to make sure log is auditable
+	5. logs return SCTs (signed certificate timestamps) to the CA, CA attach SCTs to a certificate
+	6. CA sends the certificate to the domain owner, through a TLS handshake
+	7. browsers and user agents help keep the we secure, by keeping the certificates
+	8. monitor process periodically polls logs and report fake certificates, and newly issued certificates will be notified to domain owner
+- CT is not perfect
+	+ the cryptographic proof can not be done instantly
+	+ it is possible that a malicious certificate authority can steal passwords for at least some small period of time until a monitor catches it
+
+## EP47: Collaborative Text Editing
+- OT (operational transform)
+	+ transform function converts ordered operations into proper ones, so each local copy of the documents converges in the way it is supposed to
+	+ the transform function could be very complicated with lots of edge cases
+- CRDT (conflict-free replicated data type)
+	+ operation based CRDT is better for text editing
+	+ need to keep the intention of each collaborator
+	+ requires causal broadcast for deletes
+	+ later investigation of CRDT for rich text editing ([Peritext](https://www.inkandswitch.com/peritext/static/cscw-publication.pdf))
+
+## EP48: Bitcoin
+- decentralized currency, leverages blockchain, along with cyptographic proofs
+- coin
+	+ owner's public key
+	+ hash of previous block
+	+ previous owner's signature
+- double spending problem, needs to be resolved by blockchain
+- block
+	+ hash of previous block
+	+ transactions
+	+ a nonce, to prove validity of the block
+- a node wants to add a block, it must broadcast it to all the other nodes
+	+ a peer node receives new transactions and adds them into block
+	+ it uses some amount of CPU power to determine the nonce (proof of work)
+	+ find x such that hash(transactions, prev_block_hash, x) starts with n leading zeros
+	+ after nonce is found, the block is broadcasted to other peers
+- once peers receive a block, they need to validate the block
+	+ hash of the new block has the proper number of leader zeros
+	+ prev block hash points to existing block in chain
+	+ transactions in the block are valid
+- forks in the blockchain
+	+ if two peers find the noonce of a block at the same time, so some nodes process them in different orders
+	+ or if one malicious peer sends a block to a subset of nodes and a different block to another subset
+- peers will continue to add blocks to whichever branch of the fork that they received first; if it sees another branch has gotten longer it will abandon its current shorter branch and use the other branch.
+	+ in this way, double spending is technically possible, but most parties will wait until a few blocks have been processed after the one holding a given transaciton in order to ensure that it is likely the transation will stay in the blockchain
+
+## EP49: Neo4j (Graph Databases)
+- data format
+	+ node: point
+	+ property: key value pair on node
+	+ relationship: edge
+	+ label: information to edge
+- Neo4j is a native graph database, by representing data in its actual graph form on disk, with a significant performance improvement when traversing graph
+- different data formats are stored separately, e.g. different files for nodes, relationships, properties, and labels
+	+ each node contains a pointer to its first relationship
+	+ each relationship contains a pointer to the next relationship from that node
+	+ this works effectively as a mini index, data is linked, this is known as index-free adjacency
+- by using index-freee adjacency, the speed of a query depends on the number of nodes involved, not the size of the whole graph
+- challenges with graph data
+	+ ACID: modifying a relationship is not an isolated operation; Neo4j has been forced to use a write ahead log for atomicity, as well as locking in order to ensure two transactions do not get jumbled up
+	+ distributed transaction ordering: if two transcations overlap on multiple partitions, and involved partitions need to order them the same way; Neo4j tries to figure out the overlapped partitions, and use one of them as a sort of transction coordinator to ensure all involved partitions commit at the same time; for replication, Neo4j uses Raft to ensure consistency
+
+## EP50: Approaching Interview Questions
+- requirement clarification
+	+ scale, performance goals
+	+ functional requirement
+- capacity estimation
+	+ ratio of reads to writes
+	+ number of users, average size of data
+- API definition
+	+ function calls
+- data tables
+	+ columns
+	+ index
+	+ sql
+- get designing
+	+ no single point of failure
+	+ load balancing
+	+ replication
+	+ sharding
+	+ database choice
+	+ microservice
+- why is prior to how
+	+ list tradeoffs of design choices
 
