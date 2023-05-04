@@ -4,6 +4,10 @@ A Request for Comments (RFC) is a publication in a series from the principal tec
 
 The IETF adopts some of the proposals published as RFCs as Internet Standards. However, many RFCs are informational or experimental in nature and are not standards.
 
+## RFC 2119
+
+Interpret and describe the key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL": https://www.rfc-editor.org/rfc/pdfrfc/rfc2119.txt.pdf
+
 ## RFC 3283
 
 Guide to Internet Calendaring: https://www.rfc-editor.org/rfc/pdfrfc/rfc3283.txt.pdf

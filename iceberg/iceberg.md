@@ -8,6 +8,15 @@ Essentially, it is a table management layer, based on the data storage layer.
 
 ![The position of Iceberg](data_lake.webp)
 
+## Table format
+
+![Table format](table_format.webp)
+
+- Snapshot metadata file: contains metadata about the table like the table schema, the partition specification as well as a path to the manifest list.
+- Manifest list: contains an entry for each manifest file associated with the snapshot. Each entry includes a path to the manifest file and some metadata about the file, including partition stats and data file counts. These stats can be used to avoid reading manifests that aren’t required for an operation.
+- Manifest file: contains a list of paths to related data files. Each entry for a data file includes some metadata about the file, such as per-column upper and lower bounds which can be used to prune files during query planning.
+- Data file: the physical data file, written in formats like Parquet, ORC, Avro etc.
+
 ## Schema evolution
 table schema can be managed by configured back-end, like JDBC, Hive metastore, etc.
 
@@ -18,12 +27,47 @@ the schema evolution is easy because all the change only updates the metadata, n
 
 Iceberg uses unique IDs to track each column in a table. When you add a column, it is assigned a new ID so existing data is never used by mistake.
 
+These safe schema evolutions can be supported:
+```
+#Add columns
+table.updateSchema()
+     .addColumn("hotel_geo_id", Types.LongType.get())
+     .commit();
+#Delete columns
+table.updateSchema()
+     .deleteColumn("hotel_name")
+     .commit();
+#Rename columns
+table.updateSchema()
+     .renameColumn("arrival_date", "check_in_date")
+     .commit();
+#Promote int -> long
+table.updateSchema()
+     .updateColumn("price", Types.LongType.get())
+     .commit();
+#Promote float -> double
+table.updateSchema()
+     .updateColumn("float", Types.DoubleType.get())
+     .commit();
+#Widen decimal precision
+table.updateSchema()
+     .updateColumn("decimal", Types.DecimalType.of(4, 2))
+     .commit();
+#Rearrange columns
+table.updateSchema()
+     .moveAfter("customer_id", "hotel_id")
+     .moveBefore("hotel_name", "hotel_id")
+     .commit();
+```
+
 ## Partitioning
 Other tables formats like Hive support *partitioning*, but Iceberg supports **hidden partitioning**.
 
 Iceberg produces partition values by taking a column value and optionally transforming it. Iceberg is responsible for converting `event_time` into `event_date`, and keeps track of the relationship.
 
 [supported partition transforms](https://iceberg.apache.org/spec/#partition-transforms)
+
+![Partition evolution](partition_evolution.webp)
 
 ## Maintenance
 Each write to an Iceberg table creates a new snapshot, or version, of a table. Snapshots can be used for time-travel queries, or the table can be rolled back to any valid snapshot.
@@ -104,3 +148,5 @@ Iceberg tables support these [data types](https://iceberg.apache.org/docs/latest
 
 ## References
 - official doc: https://iceberg.apache.org/docs/latest/
+- brief intro: https://www.jianshu.com/p/c202569008a7
+- A Short Introduction to Apache Iceberg: https://medium.com/expedia-group-tech/a-short-introduction-to-apache-iceberg-d34f628b6799
