@@ -180,6 +180,7 @@ Make decision by balancing the reasons of disintegrators and integrators.
 
 
 
+
 ## Chapter 9 - Data Ownership and Distributed Transactions
 
 ### Distributed Transactions
