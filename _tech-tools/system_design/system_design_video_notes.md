@@ -403,9 +403,9 @@ types of isolations/solutions:
 - CRDT types
 	+ operations based CRDT, commutative replicated data types (CmRDT)
 		* only delta ops are transmitted
-		* not idempotent, network ensures
+		* should be commutative, not idempotent, network ensures
 	+ state based CRDT, convergent replicated data types (CvRDT)
-		* should be commutative and idempotent
+		* should be commutative, associative and idempotent
 		* works well with gossip protocol
 
 ## EP24: Riak explained

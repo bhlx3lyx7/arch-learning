@@ -178,6 +178,24 @@ Make decision by balancing the reasons of disintegrators and integrators.
 
 ## Chapter 8 - Reuse Patterns
 
+WET: Write every time or Write everything twice
+DRY: Don't repeat yourself
+
+No reuse in distributed architecture, but in practice there are still some reuse patterns.
+
+### Code Replication
+
+Advantages:
+- preserves the bounded context
+- no code sharing
+
+Disadvantages:
+- difficult to apply code changes
+- code inconsistency across services
+- no versionning capability across services
+
+### Shared Library
+
 
 
 
