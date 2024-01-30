@@ -95,7 +95,7 @@ Fork another branch and delete is better than extraction.
 
 ## Chapter 6 - Pulling Apart Operational Data
 
-Breaking apart a database is hard—much harder, in fact, than breaking apart applica‐ tion functionality.
+Breaking apart a database is hard—much harder, in fact, than breaking apart application functionality.
 
 ### Data Decomposition Drivers
 
