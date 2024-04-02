@@ -33,3 +33,4 @@ etcd leader node monitor thread triggers ttl key expiration every 500ms
 
 ## References
 - Watch API and TTL implementation in etcd: https://hustcat.github.io/watch_in_etcd/
+- watch in etcd: https://www.lixueduan.com/posts/etcd/05-watch/

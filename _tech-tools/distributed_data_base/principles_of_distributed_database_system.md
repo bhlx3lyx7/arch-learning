@@ -196,7 +196,7 @@ Multi-tenant database models:
 
 The distribution design starts from this global conceptual schema (GCS) and follows two tasks: partitioning (fragmentation) and allocation.
 
-1. fragmentation: GCS -> set of LCSs
+1. distribution design (need auxiliary information): GCS -> set of LCSs
 2. allocation: set of LCSs -> each LCS
 3. physical design: LCS -> physical schema
 
@@ -219,5 +219,46 @@ Requirement of data fragmentation:
 3. Disjointness (for horizontally fragmentation): unique records
 
 #### Horizontal Fragmentation
+
+- primary horizontal fragmentation: partition by predicates defined in current relation
+- derived horizontal fragmentation: partition by predicates defined in another relation
+
+#### Vertical Fragmentation
+
+It is huge number of possible combinations of columns, thus we have to resort to heuristic approaches for vertical fragmentation
+- grouping: start by assigning each attribute to one fragment, and at each step, join/group some of them, until some criteria are satisfied; might lead to overlapping attributes
+- splitting: start with a relation and decide on beneficial partitionings based on the access behavior of applications to the attributes; will not overlap
+
+1. figure out attribute existance in queries
+2. cluster algorithm to group related attributes
+3. split algorithm to split attribute groups
+4. check for correctness
+
+#### Hybrid Fragmentation
+
+In some special cases, vertical fragmentation and horizontal fragmentation may be followed by the other, producing a tree-structured partitioning
+
+### Allocation
+
+replication types:
+- full replication
+- partial replication
+- partitioned without replication
+
+partitioning techniques:
+- workload-agnostic: round-robin, hash, range
+- workload-aware: partition by query pattern, better used for vertical partitioning, related partitions can be replicated and located together
+
+### Adaptive Approaches
+
+- How to detect workload changes that require changes in the distribution design?
+- How to determine which data items are going to be affected in the design?
+- How to perform the changes in an efficient manner?
+
+1. detect workload changes
+2. detect affected items
+3. incremental reconfiguration: instead of batch run of re-partitioning
+
+## Chapter 3 - Distributed Data Control
 
 
