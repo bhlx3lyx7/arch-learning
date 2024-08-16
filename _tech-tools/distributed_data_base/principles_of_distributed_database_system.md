@@ -261,4 +261,3 @@ partitioning techniques:
 
 ## Chapter 3 - Distributed Data Control
 
-
