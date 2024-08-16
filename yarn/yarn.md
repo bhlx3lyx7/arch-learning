@@ -16,7 +16,7 @@ flowchart TD
     nm1 -->|2b. launch app master process| mc1[Container of app master]
     end
 
-    mc1 -->|3. allocate resources (heartbeat)| rm
+    mc1 -->|3. allocate resources within heartbeat| rm
     mc1 -->|4a. strat app executor| nm2[Node manager]
 
     subgraph nd2 [node 2]
